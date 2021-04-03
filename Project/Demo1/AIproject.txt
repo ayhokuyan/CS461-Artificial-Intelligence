@@ -1,0 +1,103 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+import re
+from datetime import datetime
+import os
+import time
+from tkinter import Tk, Canvas, Frame, BOTH
+
+now = datetime.now()
+desktopPath = os.path.join(os.path.expanduser('~'), 'Desktop')
+fileStr = os.path.join(desktopPath, "Puzzle-{month}-{day}.txt".format(month=now.month, day=now.day))
+file = open(fileStr, "w+", encoding="utf-8")
+driver = webdriver.Chrome()
+driver.get('https://www.nytimes.com/crosswords/game/mini')
+driver.find_element_by_xpath("/html/body/div[1]/div/div/div[4]/div/main/div[2]/div/div[2]/div[2]/article/div[2]/button").click()
+time.sleep(3)
+driver.find_element_by_xpath("/html/body/div[1]/div/div/div[4]/div/main/div[2]/div/div/ul/div[2]/li[2]/button").click()
+time.sleep(3)
+driver.find_element_by_xpath("/html/body/div[1]/div/div/div[4]/div/main/div[2]/div/div/ul/div[2]/li[2]/ul/li[3]/a").click()
+time.sleep(3)
+driver.find_element_by_xpath("/html/body/div[1]/div/div[2]/div[2]/article/div[2]/button[2]/div").click()
+time.sleep(3)
+driver.find_element_by_xpath("/html/body/div[1]/div/div[2]/div[2]/span").click()
+
+hint_list = {} #fill later
+keywords = ("Across", "Down")
+index = 0
+prev_no = 0
+clues_of_across = []
+clues_of_down = []
+clues = driver.find_elements_by_class_name("Clue-text--3lZl7")
+numbers = driver.find_elements_by_class_name("Clue-label--2IdMY")
+for number, clue in zip(numbers, clues):
+    no = number.get_property("textContent")
+    content = clue.get_property("textContent")
+    if (int(no) < prev_no):
+        index = 1
+    s = keywords[index] + ":\t" + no + " " + content + "\n"
+    print(s)
+    if index == 0:
+        clues_of_across.append([keywords[0],no,content])
+    else:
+        clues_of_down.append([keywords[1], no, content])
+    file.write(s)
+    prev_no = int(no)
+
+
+reveals = {}
+for i in range(25):
+    reveal = driver.find_element_by_id("cell-id-{i}".format(i=i))
+    reveal_sibs = reveal.get_property("parentNode").get_property("childElementCount")
+    if reveal_sibs == 1:
+        s = str(i + 1) + ":\tblack" + "\n"
+        file.write(s)
+        reveals[i + 1] = ("black","","")
+    elif reveal_sibs == 3:
+        value = reveal.get_property("parentNode").get_property("childNodes")[1].get_property("textContent")
+        s = str(i + 1) + ":\twhite " + value + "\n"
+        file.write(s)
+
+        reveals[i + 1] = ("white", value,"")
+    elif reveal_sibs == 4:
+        number = reveal.get_property("parentNode").get_property("childNodes")[1].get_property("textContent")
+        value = reveal.get_property("parentNode").get_property("childNodes")[2].get_property("textContent")
+        s = str(i + 1) + ":\twhite " + value + " " + number + "\n"
+        file.write(s)
+        reveals[i + 1] = ("white", value, number)
+file.close()
+#drawing shape part
+x = 0
+root = Tk()
+canvas = Canvas(root, width=1024, height=2048)
+for i in range(5):
+    for j in range(5):
+        x += 1
+        if reveals[x][0] == "black":
+            canvas.create_rectangle(100 * (j + 1), 100 * (i + 1), 100 + (100 * (j + 1)), 100 + (100 * (i + 1)),
+                                    fill="black")
+        elif reveals[x][2] != "":
+            canvas.create_rectangle(100 * (j + 1), 100 * (i + 1), 100 + (100 * (j + 1)), 100 + (100 * (i + 1)),
+                                fill="white")
+            canvas.create_text((100 * (j + 1)) + 50, (100 * (i + 1)) + 50, fill="blue", font="Arial 40 bold",
+                           text=reveals[x][1])
+            canvas.create_text((100 * (j + 1)) + 10, (100 * (i + 1)) + 10, fill="black",
+                           font="Arial 15 ",text=reveals[x][2])
+        else:
+            canvas.create_rectangle(100 * (j + 1), 100 * (i + 1), 100 + (100 * (j + 1)), 100 + (100 * (i + 1)),
+                                    fill="white")
+            canvas.create_text((100 * (j + 1)) + 50, (100 * (i + 1)) + 50, fill="blue", font="Arial 40 bold",
+                               text=reveals[x][1])
+
+canvas.create_text( 740, 50, fill="blue", font="Arial 20 bold", text="ACROSS")
+canvas.create_text( 1040, 50, fill="blue", font="Arial 20 bold", text="DOWN")
+
+for i in range(clues_of_across.__len__()):
+    canvas.create_text(640, 150 + (i*15), fill="blue", font="Arial 10", text=clues_of_across[i][1] + " " + clues_of_across[i][2], anchor = "w")
+
+for i in range(clues_of_down.__len__()):
+    canvas.create_text(990, 150 + (i*15), fill="blue", font="Arial 10", text=clues_of_down[i][1] + " " + clues_of_down[i][2], anchor = "w")
+
+canvas.pack(fill=BOTH, expand=1)
+root.mainloop()
